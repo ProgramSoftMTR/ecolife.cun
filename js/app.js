@@ -6,8 +6,9 @@
 (function () {
   // Constantes y Estado de la Aplicación
   const STORAGE_KEY = 'ecomonteria_bins_v1';
-  const MONTERIA_COORDS = [8.7550, -75.8850]; // Coordenadas centrales de Montería
-  const DEFAULT_ZOOM = 14;
+  const MONTERIA_COORDS = [8.7550, -75.8850]; // Coordenadas centrales de Montería (Ronda del Sinú / Centro)
+  const isMobile = window.innerWidth <= 900;
+  const DEFAULT_ZOOM = isMobile ? 13 : 14;
 
   let map = null;
   let heatLayer = null;
