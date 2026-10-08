@@ -57,17 +57,16 @@
     // Control de Zoom en posición derecha
     L.control.zoom({ position: 'topright' }).addTo(map);
 
-    // CARTO Basemaps con API Key oficial del usuario
-    const cartoApiKey = 'cb1_4enu_1_f4e1983c2bcc4be2da8ec905';
-    const cartoVoyager = L.tileLayer(`https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=${cartoApiKey}`, {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
-      subdomains: 'abcd',
+    // Capa OpenStreetMap estándar: 100% libre, garantizada para cargar en cualquier teléfono sin requerir API key ni recargas forzadas
+    const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       maxZoom: 19
     });
 
-    // Capa alternativa OpenStreetMap estándar (100% libre sin API key)
-    const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    // CARTO Basemaps con API Key oficial del usuario (formato estándar para móviles y web)
+    const cartoApiKey = 'cb1_4enu_1_f4e1983c2bcc4be2da8ec905';
+    const cartoVoyager = L.tileLayer(`https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=${cartoApiKey}`, {
+      attribution: '&copy; CARTO &copy; OpenStreetMap',
       maxZoom: 19
     });
 
@@ -77,15 +76,25 @@
       maxZoom: 19
     });
 
-    // Agregar Voyager por defecto con la API Key del usuario
-    cartoVoyager.addTo(map);
+    // Usar OpenStreetMap como base predeterminada para asegurar que en cualquier celular abra al instante sin marcas de agua ni bloqueos
+    osmLayer.addTo(map);
 
-    // Control selector de capas para cambiar entre Voyager, Callejero OSM y Satélite
+    // Control selector de capas (esquina superior derecha)
     L.control.layers({
-      "Mapa Urbano Moderno (CARTO)": cartoVoyager,
-      "Mapa OpenStreetMap": osmLayer,
+      "Mapa Callejero (OpenStreetMap - Rápido)": osmLayer,
+      "Mapa Moderno (CARTO con API Key)": cartoVoyager,
       "Vista Satelital (Esri)": satelliteLayer
     }, null, { position: 'topright' }).addTo(map);
+
+    // Auto-ajuste de tamaño para pantallas de celulares y tablets al cargar
+    map.whenReady(() => {
+      setTimeout(() => map.invalidateSize(), 150);
+      setTimeout(() => map.invalidateSize(), 600);
+      setTimeout(() => map.invalidateSize(), 1200);
+    });
+
+    window.addEventListener('resize', () => map.invalidateSize());
+    window.addEventListener('orientationchange', () => setTimeout(() => map.invalidateSize(), 300));
 
 
     // Escala
@@ -292,8 +301,8 @@
 
     let filtered = bins.filter(bin => {
       const matchSearch = bin.nombre.toLowerCase().includes(searchTerm) ||
-                          bin.barrio.toLowerCase().includes(searchTerm) ||
-                          bin.id.toLowerCase().includes(searchTerm);
+        bin.barrio.toLowerCase().includes(searchTerm) ||
+        bin.id.toLowerCase().includes(searchTerm);
 
       let matchFilter = true;
       if (activeFilter === 'critico') {

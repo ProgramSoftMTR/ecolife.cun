@@ -1,15 +1,23 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>EcoMontería - Mapa Inteligente y Gestión de Residuos con QR</title>
-  <meta name="description" content="Plataforma de monitoreo y mapa de calor de contenedores de basura en Montería con reportes ciudadanos mediante códigos QR y captura de fotos en tiempo real.">
+  <meta name="description"
+    content="Plataforma de monitoreo y mapa de calor de contenedores de basura en Montería con reportes ciudadanos mediante códigos QR y captura de fotos en tiempo real.">
+
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
 
   <!-- Google Fonts: Plus Jakarta Sans & Outfit -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
 
   <!-- Font Awesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
@@ -17,9 +25,10 @@
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
-  <!-- Estilos Personalizados -->
-  <link rel="stylesheet" href="css/styles.css">
+  <!-- Estilos Personalizados con versionado anti-caché -->
+  <link rel="stylesheet" href="css/styles.css?v=2.1">
 </head>
+
 <body>
   <!-- BARRA DE NAVEGACIÓN SUPERIOR -->
   <header class="app-header">
@@ -93,7 +102,8 @@
   <div id="banner-add-mode" class="banner-instruction hidden">
     <div class="banner-content">
       <i class="fa-solid fa-hand-pointer fa-bounce"></i>
-      <span><strong>Modo Ubicación Activo:</strong> Haz clic en cualquier lugar del mapa de Montería para colocar el nuevo bote de basura.</span>
+      <span><strong>Modo Ubicación Activo:</strong> Haz clic en cualquier lugar del mapa de Montería para colocar el
+        nuevo bote de basura.</span>
       <button id="btn-cancel-add-mode" class="btn btn-sm btn-ghost">Cancelar</button>
     </div>
   </div>
@@ -178,7 +188,8 @@
       <div class="modal-body">
         <!-- Selector de Nivel de Llenado con Botones Visuales -->
         <div class="form-group">
-          <label class="form-label"><i class="fa-solid fa-gauge-high"></i> ¿Cuál es el estado actual del contenedor?</label>
+          <label class="form-label"><i class="fa-solid fa-gauge-high"></i> ¿Cuál es el estado actual del
+            contenedor?</label>
           <div class="status-selector-grid">
             <label class="status-option option-vacio">
               <input type="radio" name="report-status" value="vacio">
@@ -269,11 +280,13 @@
         <div class="form-row">
           <div class="form-group">
             <label class="form-label" for="report-citizen-name">Tu Nombre (Opcional)</label>
-            <input type="text" id="report-citizen-name" class="form-control" placeholder="Ej: Vecino del sector o anónimo">
+            <input type="text" id="report-citizen-name" class="form-control"
+              placeholder="Ej: Vecino del sector o anónimo">
           </div>
           <div class="form-group">
             <label class="form-label" for="report-citizen-notes">Detalles adicionales</label>
-            <input type="text" id="report-citizen-notes" class="form-control" placeholder="Ej: Basura alrededor, tapa dañada...">
+            <input type="text" id="report-citizen-notes" class="form-control"
+              placeholder="Ej: Basura alrededor, tapa dañada...">
           </div>
         </div>
       </div>
@@ -302,13 +315,15 @@
         <form id="form-new-bin">
           <div class="form-group">
             <label class="form-label" for="new-bin-nombre">Nombre o Referencia del Punto *</label>
-            <input type="text" id="new-bin-nombre" class="form-control" placeholder="Ej: Parque Laureles - Esquina Calle 32" required>
+            <input type="text" id="new-bin-nombre" class="form-control"
+              placeholder="Ej: Parque Laureles - Esquina Calle 32" required>
           </div>
 
           <div class="form-row">
             <div class="form-group">
               <label class="form-label" for="new-bin-barrio">Barrio / Sector *</label>
-              <input type="text" id="new-bin-barrio" class="form-control" placeholder="Ej: La Castellana, El Recreo, Centro..." required>
+              <input type="text" id="new-bin-barrio" class="form-control"
+                placeholder="Ej: La Castellana, El Recreo, Centro..." required>
             </div>
             <div class="form-group">
               <label class="form-label" for="new-bin-tipo">Tipo de Contenedor</label>
@@ -457,7 +472,8 @@
         <button class="btn-close" id="btn-close-qr-simulator">&times;</button>
       </div>
       <div class="modal-body">
-        <p class="mb-3 text-muted">En el mundo real, al enfocar la cámara del teléfono al QR pegado en el contenedor, se abre directamente el formulario de reporte de ese bote específico.</p>
+        <p class="mb-3 text-muted">En el mundo real, al enfocar la cámara del teléfono al QR pegado en el contenedor, se
+          abre directamente el formulario de reporte de ese bote específico.</p>
         <div class="form-group">
           <label class="form-label" for="select-simulate-bin">Elige el contenedor a reportar:</label>
           <select id="select-simulate-bin" class="form-control">
@@ -488,8 +504,9 @@
   <!-- QRCode.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
-  <!-- LÓGICA DE LA APLICACIÓN -->
-  <script src="js/data.js"></script>
-  <script src="js/app.js"></script>
+  <!-- LÓGICA DE LA APLICACIÓN (con control de versiones anti-caché móvil) -->
+  <script src="js/data.js?v=2.1"></script>
+  <script src="js/app.js?v=2.1"></script>
 </body>
+
 </html>
