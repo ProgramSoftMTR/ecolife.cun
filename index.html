@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EcoMontería - Mapa Inteligente y Gestión de Residuos con QR</title>
+  <meta name="description" content="Plataforma de monitoreo y mapa de calor de contenedores de basura en Montería con reportes ciudadanos mediante códigos QR y captura de fotos en tiempo real.">
+
+  <!-- Google Fonts: Plus Jakarta Sans & Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+  <!-- Estilos Personalizados -->
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <!-- BARRA DE NAVEGACIÓN SUPERIOR -->
+  <header class="app-header">
+    <div class="header-brand">
+      <div class="brand-logo">
+        <i class="fa-solid fa-recycle"></i>
+      </div>
+      <div class="brand-text">
+        <h1>EcoMontería <span>Smart</span></h1>
+        <p>Sistema de Gestión de Residuos & Mapa de Calor en Vivo</p>
+      </div>
+    </div>
+
+    <!-- Indicadores de Estado Rápido -->
+    <div class="header-stats">
+      <div class="stat-badge stat-total" title="Total de contenedores registrados">
+        <i class="fa-solid fa-trash-can"></i>
+        <div>
+          <span class="stat-number" id="stat-total">0</span>
+          <span class="stat-label">Botes</span>
+        </div>
+      </div>
+      <div class="stat-badge stat-danger" title="Contenedores llenos o sobrellenos (Críticos)">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <div>
+          <span class="stat-number" id="stat-criticos">0</span>
+          <span class="stat-label">Críticos (Rojo)</span>
+        </div>
+      </div>
+      <div class="stat-badge stat-medio" title="Contenedores al 50%">
+        <i class="fa-solid fa-battery-half"></i>
+        <div>
+          <span class="stat-number" id="stat-medios">0</span>
+          <span class="stat-label">Nivel Medio</span>
+        </div>
+      </div>
+      <div class="stat-badge stat-success" title="Contenedores limpios/vacíos">
+        <i class="fa-solid fa-circle-check"></i>
+        <div>
+          <span class="stat-number" id="stat-vacios">0</span>
+          <span class="stat-label">Óptimos</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Botones de Acción Global -->
+    <div class="header-actions">
+      <button id="btn-toggle-heatmap" class="btn btn-heatmap active" title="Alternar capa de mapa de calor">
+        <i class="fa-solid fa-fire-flame-curved"></i>
+        <span>Mapa de Calor: <strong>ACTIVO</strong></span>
+      </button>
+
+      <button id="btn-add-mode" class="btn btn-primary" title="Haga clic para agregar un bote en el mapa">
+        <i class="fa-solid fa-location-dot"></i>
+        <span>+ Colocar Bote</span>
+      </button>
+
+      <button id="btn-open-citizen-report" class="btn btn-accent" title="Simular escaneo de QR para reportar con foto">
+        <i class="fa-solid fa-qrcode"></i>
+        <span>Simular Escaneo QR</span>
+      </button>
+
+      <button id="btn-view-all-qrs" class="btn btn-outline" title="Ver e imprimir códigos QR">
+        <i class="fa-solid fa-print"></i>
+        <span>Imprimir QRs</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- BANNER INFORMATIVO / MODO AGREGAR BOTE -->
+  <div id="banner-add-mode" class="banner-instruction hidden">
+    <div class="banner-content">
+      <i class="fa-solid fa-hand-pointer fa-bounce"></i>
+      <span><strong>Modo Ubicación Activo:</strong> Haz clic en cualquier lugar del mapa de Montería para colocar el nuevo bote de basura.</span>
+      <button id="btn-cancel-add-mode" class="btn btn-sm btn-ghost">Cancelar</button>
+    </div>
+  </div>
+
+  <!-- CONTENEDOR PRINCIPAL -->
+  <main class="main-container">
+    <!-- PANEL LATERAL DE CONTENEDORES Y FILTROS -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-title">
+          <i class="fa-solid fa-layer-group"></i>
+          <h3>Puntos en Montería</h3>
+        </div>
+        <span class="badge" id="sidebar-count">9 puntos</span>
+      </div>
+
+      <!-- Buscador y Filtros -->
+      <div class="sidebar-search">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="text" id="input-search" placeholder="Buscar por barrio o nombre...">
+      </div>
+
+      <div class="status-filters">
+        <button class="filter-chip active" data-filter="all">Todos</button>
+        <button class="filter-chip filter-critico" data-filter="critico">
+          <span class="dot dot-red"></span> Llenos/Rojo
+        </button>
+        <button class="filter-chip filter-medio" data-filter="medio">
+          <span class="dot dot-yellow"></span> Medios
+        </button>
+        <button class="filter-chip filter-vacio" data-filter="vacio">
+          <span class="dot dot-green"></span> Vacíos
+        </button>
+      </div>
+
+      <!-- Lista Scrollable de Botes -->
+      <div class="bins-list" id="bins-list">
+        <!-- Renderizado dinámicamente con JS -->
+      </div>
+
+      <!-- Pie del Sidebar con Leyenda -->
+      <div class="sidebar-footer">
+        <div class="legend-box">
+          <div class="legend-item"><span class="badge-dot dot-red"></span> Sobrelleno / Lleno (Peligro)</div>
+          <div class="legend-item"><span class="badge-dot dot-yellow"></span> Medio Lleno (Atención)</div>
+          <div class="legend-item"><span class="badge-dot dot-green"></span> Vacío / Limpio (Óptimo)</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ÁREA DEL MAPA INTERACTIVO -->
+    <section class="map-wrapper">
+      <div id="map" class="map-container"></div>
+
+      <!-- Botón Flotante para Alternar Panel Móvil -->
+      <button id="btn-toggle-sidebar" class="fab-toggle-sidebar" title="Alternar panel lateral">
+        <i class="fa-solid fa-bars"></i>
+      </button>
+
+      <!-- Tarjeta Flotante Informativa sobre Montería -->
+      <div class="map-floating-overlay">
+        <div class="overlay-pill">
+          <span class="live-pulse"></span>
+          <span>Montería, Córdoba &bull; Monitoreo en Tiempo Real</span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- MODAL: REPORTAR ESTADO POR QR (INTERFAZ CIUDADANA CON CÁMARA EN TIEMPO REAL) -->
+  <div class="modal-overlay hidden" id="modal-report">
+    <div class="modal-dialog modal-citizen">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="tag-qr"><i class="fa-solid fa-qrcode"></i> Escaneo QR Registrado</span>
+          <h2 id="report-modal-bin-title">Reportar Contenedor</h2>
+          <p id="report-modal-bin-location">Ubicación</p>
+        </div>
+        <button class="btn-close" id="btn-close-report-modal">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Selector de Nivel de Llenado con Botones Visuales -->
+        <div class="form-group">
+          <label class="form-label"><i class="fa-solid fa-gauge-high"></i> ¿Cuál es el estado actual del contenedor?</label>
+          <div class="status-selector-grid">
+            <label class="status-option option-vacio">
+              <input type="radio" name="report-status" value="vacio">
+              <div class="status-card">
+                <i class="fa-solid fa-circle-check"></i>
+                <span class="status-title">Vacío</span>
+                <span class="status-desc">Capacidad disponible</span>
+              </div>
+            </label>
+
+            <label class="status-option option-medio">
+              <input type="radio" name="report-status" value="medio">
+              <div class="status-card">
+                <i class="fa-solid fa-battery-half"></i>
+                <span class="status-title">Medio Lleno</span>
+                <span class="status-desc">Cerca del 50%</span>
+              </div>
+            </label>
+
+            <label class="status-option option-lleno">
+              <input type="radio" name="report-status" value="lleno">
+              <div class="status-card">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <span class="status-title">Lleno</span>
+                <span class="status-desc">Casi al tope (Rojo)</span>
+              </div>
+            </label>
+
+            <label class="status-option option-sobrelleno">
+              <input type="radio" name="report-status" value="sobrelleno" checked>
+              <div class="status-card">
+                <i class="fa-solid fa-burst"></i>
+                <span class="status-title">Sobrelleno</span>
+                <span class="status-desc">¡Desbordado! (Alerta Roja)</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- MÓDULO DE FOTO EN TIEMPO REAL -->
+        <div class="form-group photo-module">
+          <label class="form-label">
+            <i class="fa-solid fa-camera"></i> Foto en Tiempo Real del Bote de Basura
+            <span class="required-badge">* Requerido</span>
+          </label>
+          <p class="form-help">Tome o capture una foto como evidencia del estado del contenedor.</p>
+
+          <!-- Opciones para Captura -->
+          <div class="camera-actions">
+            <button type="button" id="btn-start-camera" class="btn btn-secondary">
+              <i class="fa-solid fa-video"></i> Abrir Cámara en Vivo
+            </button>
+            <label class="btn btn-outline file-upload-btn">
+              <i class="fa-solid fa-camera-retro"></i> Tomar con Cámara del Celular / Archivo
+              <input type="file" id="input-photo-file" accept="image/*" capture="environment" hidden>
+            </label>
+          </div>
+
+          <!-- Visor de Cámara en Vivo con WebRTC -->
+          <div id="live-camera-container" class="camera-stream-box hidden">
+            <video id="camera-video" autoplay playsinline></video>
+            <div class="camera-controls">
+              <button type="button" id="btn-take-snapshot" class="btn btn-capture">
+                <i class="fa-solid fa-circle-dot"></i> Capturar Foto Ahora
+              </button>
+              <button type="button" id="btn-stop-camera" class="btn btn-sm btn-ghost">
+                Cerrar Cámara
+              </button>
+            </div>
+          </div>
+
+          <!-- Lienzo invisible para procesar la foto -->
+          <canvas id="camera-canvas" class="hidden"></canvas>
+
+          <!-- Vista Previa de la Foto Capturada -->
+          <div id="photo-preview-container" class="photo-preview-card hidden">
+            <img id="photo-preview-img" src="" alt="Foto capturada del contenedor">
+            <div class="photo-preview-actions">
+              <span class="badge badge-success"><i class="fa-solid fa-check"></i> Foto lista</span>
+              <button type="button" id="btn-remove-photo" class="btn btn-sm btn-danger-outline">
+                <i class="fa-solid fa-trash"></i> Descartar y tomar otra
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Datos del Ciudadano y Observaciones -->
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="report-citizen-name">Tu Nombre (Opcional)</label>
+            <input type="text" id="report-citizen-name" class="form-control" placeholder="Ej: Vecino del sector o anónimo">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="report-citizen-notes">Detalles adicionales</label>
+            <input type="text" id="report-citizen-notes" class="form-control" placeholder="Ej: Basura alrededor, tapa dañada...">
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" id="btn-cancel-report">Cancelar</button>
+        <button type="button" class="btn btn-danger-action" id="btn-submit-report">
+          <i class="fa-solid fa-paper-plane"></i> Enviar Reporte
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: REGISTRAR NUEVO BOTE EN EL MAPA -->
+  <div class="modal-overlay hidden" id="modal-new-bin">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <h2><i class="fa-solid fa-plus-circle text-primary"></i> Registrar Nuevo Bote de Basura</h2>
+          <p>Ubicación seleccionada en las coordenadas de Montería</p>
+        </div>
+        <button class="btn-close" id="btn-close-new-bin">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <form id="form-new-bin">
+          <div class="form-group">
+            <label class="form-label" for="new-bin-nombre">Nombre o Referencia del Punto *</label>
+            <input type="text" id="new-bin-nombre" class="form-control" placeholder="Ej: Parque Laureles - Esquina Calle 32" required>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="new-bin-barrio">Barrio / Sector *</label>
+              <input type="text" id="new-bin-barrio" class="form-control" placeholder="Ej: La Castellana, El Recreo, Centro..." required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="new-bin-tipo">Tipo de Contenedor</label>
+              <select id="new-bin-tipo" class="form-control">
+                <option value="Reciclaje y Ordinarios">Reciclaje y Ordinarios</option>
+                <option value="Plásticos y Aprovechables">Plásticos y Aprovechables</option>
+                <option value="Orgánicos">Orgánicos / Restos de Comida</option>
+                <option value="Punto Ecológico Integral">Punto Ecológico Integral (3 Tolvas)</option>
+                <option value="Desechos Industriales">Desechos Industriales / Comerciales</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="new-bin-lat">Latitud GPS</label>
+              <input type="text" id="new-bin-lat" class="form-control" readonly>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="new-bin-lng">Longitud GPS</label>
+              <input type="text" id="new-bin-lng" class="form-control" readonly>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="new-bin-estado-inicial">Estado Inicial</label>
+            <select id="new-bin-estado-inicial" class="form-control">
+              <option value="vacio">Vacío / Óptimo (Verde)</option>
+              <option value="medio">Medio Lleno (Amarillo)</option>
+              <option value="lleno">Lleno (Rojo)</option>
+              <option value="sobrelleno">Sobrelleno (Alerta Roja)</option>
+            </select>
+          </div>
+        </form>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" id="btn-cancel-new-bin">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="btn-save-new-bin">
+          <i class="fa-solid fa-floppy-disk"></i> Guardar y Generar Código QR
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: DETALLES DEL CONTENEDOR, FICHA TÉCNICA Y QR INDIVIDUAL -->
+  <div class="modal-overlay hidden" id="modal-detail">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="badge" id="detail-code">MON-001</span>
+          <h2 id="detail-title">Nombre del Contenedor</h2>
+          <p id="detail-barrio">Barrio</p>
+        </div>
+        <button class="btn-close" id="btn-close-detail">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="detail-grid">
+          <!-- Columna Izquierda: Tarjeta QR lista para el contenedor -->
+          <div class="detail-qr-card">
+            <h4>Código QR Asignado</h4>
+            <p class="qr-subtitle">Imprime este código y pégalo en el bote</p>
+            <div id="detail-qr-container" class="qr-canvas-wrapper"></div>
+            <span class="qr-id-label" id="detail-qr-id">ID: MON-001</span>
+            <button class="btn btn-sm btn-outline" id="btn-download-single-qr">
+              <i class="fa-solid fa-download"></i> Descargar QR
+            </button>
+          </div>
+
+          <!-- Columna Derecha: Estado actual y acciones -->
+          <div class="detail-info-col">
+            <div class="info-block">
+              <label>Estado en Tiempo Real</label>
+              <div id="detail-status-pill" class="status-pill pill-danger">
+                <i class="fa-solid fa-triangle-exclamation"></i> Sobrelleno (Rojo)
+              </div>
+            </div>
+
+            <div class="info-block">
+              <label>Tipo de Contenedor</label>
+              <p id="detail-tipo" class="info-value">Reciclaje</p>
+            </div>
+
+            <div class="info-block">
+              <label>Coordenadas GPS</label>
+              <p id="detail-coords" class="info-value">8.7562, -75.8856</p>
+            </div>
+
+            <div class="detail-actions">
+              <button id="detail-btn-report" class="btn btn-danger-action">
+                <i class="fa-solid fa-camera"></i> Registrar Reporte Ciudadano
+              </button>
+              <button id="detail-btn-empty" class="btn btn-success-action">
+                <i class="fa-solid fa-broom"></i> Marcar como Limpio / Vaciado
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Historial de Reportes y Fotos Recibidas -->
+        <div class="history-section">
+          <h4><i class="fa-solid fa-clock-rotate-left"></i> Historial de Reportes & Fotos</h4>
+          <div id="detail-history-list" class="history-list">
+            <!-- Cargado dinámicamente -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: IMPRESIÓN MASIVA DE TARJETAS QR -->
+  <div class="modal-overlay hidden" id="modal-all-qrs">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <h2><i class="fa-solid fa-qrcode"></i> Códigos QR para Contenedores de Montería</h2>
+          <p>Placas y etiquetas listas para imprimir y colocar físicamente en cada contenedor</p>
+        </div>
+        <button class="btn-close" id="btn-close-all-qrs">&times;</button>
+      </div>
+
+      <div class="modal-body printable-area">
+        <div class="print-toolbar no-print">
+          <p>Estas etiquetas contienen el enlace directo para que los monterianos escaneen y reporten con foto:</p>
+          <button class="btn btn-primary" onclick="window.print()">
+            <i class="fa-solid fa-print"></i> Imprimir Todas las Tarjetas
+          </button>
+        </div>
+
+        <div id="qr-stickers-grid" class="qr-stickers-grid">
+          <!-- Generado dinámicamente con QRs individuales -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: SELECTOR PARA SIMULAR ESCANEO QR -->
+  <div class="modal-overlay hidden" id="modal-qr-simulator">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <h2><i class="fa-solid fa-mobile-screen-button"></i> Simular Escaneo de QR Ciudadano</h2>
+          <p>Selecciona un bote de Montería como si hubieras escaneado su placa física con tu móvil</p>
+        </div>
+        <button class="btn-close" id="btn-close-qr-simulator">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-3 text-muted">En el mundo real, al enfocar la cámara del teléfono al QR pegado en el contenedor, se abre directamente el formulario de reporte de ese bote específico.</p>
+        <div class="form-group">
+          <label class="form-label" for="select-simulate-bin">Elige el contenedor a reportar:</label>
+          <select id="select-simulate-bin" class="form-control">
+            <!-- Opciones cargadas por JS -->
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" id="btn-cancel-simulate">Cancelar</button>
+        <button type="button" class="btn btn-accent" id="btn-confirm-simulate">
+          <i class="fa-solid fa-arrow-right-to-bracket"></i> Abrir Pantalla de Reporte
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ALERTA TOAST NOTIFICACIÓN -->
+  <div id="toast" class="toast hidden">
+    <i class="toast-icon fa-solid fa-circle-check"></i>
+    <div class="toast-message">Mensaje</div>
+  </div>
+
+  <!-- LIBRERÍAS EXTERNAS -->
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Leaflet Heatmap Plugin -->
+  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+  <!-- QRCode.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <!-- LÓGICA DE LA APLICACIÓN -->
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
