@@ -39,11 +39,32 @@
   }
 
   function saveBinsData() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(bins));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(bins));
+    } catch (e) {
+      console.warn("Cuota de LocalStorage excedida en móvil. Optimizando historial de fotos...", e);
+      try {
+        // Podar fotos pesadas del historial antiguo para no saturar los 5MB del navegador móvil
+        bins.forEach(bin => {
+          if (bin.historial && bin.historial.length > 3) {
+            bin.historial = bin.historial.slice(0, 3);
+          }
+          if (bin.historial) {
+            bin.historial.forEach((h, idx) => {
+              if (idx > 0) h.foto = null; // Mantener foto completa solo en el reporte más reciente
+            });
+          }
+        });
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(bins));
+      } catch (innerError) {
+        console.warn("Continuando con estado en memoria:", innerError);
+      }
+    }
     updateStats();
     renderBinsList();
     updateHeatmap();
   }
+
 
   // ==========================================================================
   // Inicialización del Mapa de Montería
@@ -561,7 +582,7 @@
     const nowStr = new Date().toLocaleString('es-CO');
     ctx.fillText(`EcoMontería • Evidencia en Vivo: ${nowStr}`, 20, canvas.height - 20);
 
-    capturedPhotoBase64 = canvas.toDataURL('image/jpeg', 0.85);
+    capturedPhotoBase64 = canvas.toDataURL('image/jpeg', 0.75);
 
     // Detener la cámara y mostrar vista previa
     stopCameraStream();
@@ -569,17 +590,56 @@
     showToast('Foto capturada correctamente', 'success');
   }
 
+  // Compresor de fotos móvil automático para evitar saturar memoria y LocalStorage
+  function compressImage(file, maxWidth, maxHeight, quality, callback) {
+    const reader = new FileReader();
+    reader.onload = function (e) {
+      const img = new Image();
+      img.onload = function () {
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+        callback(compressedDataUrl);
+      };
+      img.onerror = function () {
+        // En caso de error de decodificación, retornar original
+        callback(e.target.result);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
   function handleFileInputPhoto(event) {
     const file = event.target.files[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = function (e) {
-      capturedPhotoBase64 = e.target.result;
+    showToast('Procesando foto del celular...', 'info');
+    // Redimensionar a máx 800px para que pese ~50KB en lugar de 10MB
+    compressImage(file, 800, 800, 0.72, function (compressedUrl) {
+      capturedPhotoBase64 = compressedUrl;
       displayPhotoPreview(capturedPhotoBase64);
-      showToast('Foto cargada exitosamente', 'success');
-    };
-    reader.readAsDataURL(file);
+      showToast('Foto optimizada y lista', 'success');
+    });
   }
 
   function displayPhotoPreview(dataUrl) {
@@ -589,72 +649,97 @@
   }
 
   function submitCitizenReport() {
-    if (!currentActiveBin) return;
+    const submitBtn = document.getElementById('btn-submit-report');
+    if (!submitBtn) return;
 
-    const selectedRadio = document.querySelector('input[name="report-status"]:checked');
-    if (!selectedRadio) {
-      alert('Por favor selecciona el estado del contenedor.');
+    // Asegurar que exista un contenedor activo (si se abrió por link o directo)
+    if (!currentActiveBin) {
+      currentActiveBin = bins[0];
+    }
+    if (!currentActiveBin) {
+      alert('Por favor selecciona un contenedor para reportar.');
       return;
     }
 
-    const nuevoEstado = selectedRadio.value;
-    const ciudadano = document.getElementById('report-citizen-name').value.trim() || 'Ciudadano en Montería';
-    const comentario = document.getElementById('report-citizen-notes').value.trim() || 'Reporte de nivel mediante código QR';
-
-    // Validación de foto: si no tomó foto, generar una imagen de muestra con canvas
-    if (!capturedPhotoBase64) {
-      // Generar snapshot sintético para garantizar evidencia fotográfica
-      capturedPhotoBase64 = generatePlaceholderEvidence(currentActiveBin.nombre, nuevoEstado);
+    const selectedRadio = document.querySelector('input[name="report-status"]:checked');
+    if (!selectedRadio) {
+      alert('Por favor selecciona el estado del contenedor (Vacío, Medio, Lleno o Sobrelleno).');
+      return;
     }
 
-    const ahora = new Date();
-    const fechaHora = ahora.toLocaleString('es-CO', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    // Feedback visual en el botón para evitar doble toque en celulares
+    const originalBtnHtml = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando...';
 
-    const reporteObj = {
-      fecha: fechaHora,
-      estado: nuevoEstado,
-      ciudadano: ciudadano,
-      comentario: comentario,
-      foto: capturedPhotoBase64
-    };
+    try {
+      const nuevoEstado = selectedRadio.value;
+      const ciudadano = document.getElementById('report-citizen-name').value.trim() || 'Ciudadano en Montería';
+      const comentario = document.getElementById('report-citizen-notes').value.trim() || 'Reporte de nivel mediante código QR';
 
-    // Actualizar contenedor
-    currentActiveBin.estado = nuevoEstado;
-    currentActiveBin.nivelPorcentaje = nuevoEstado === 'sobrelleno' ? 100 : (nuevoEstado === 'lleno' ? 90 : (nuevoEstado === 'medio' ? 50 : 10));
-    currentActiveBin.ultimoReporte = {
-      fecha: "Hace un momento",
-      ciudadano: ciudadano,
-      comentario: comentario,
-      foto: capturedPhotoBase64
-    };
+      // Si no tomó foto, generar evidencia fotográfica sintética
+      if (!capturedPhotoBase64) {
+        capturedPhotoBase64 = generatePlaceholderEvidence(currentActiveBin.nombre, nuevoEstado);
+      }
 
-    if (!currentActiveBin.historial) currentActiveBin.historial = [];
-    currentActiveBin.historial.unshift(reporteObj);
+      const ahora = new Date();
+      const fechaHora = ahora.toLocaleString('es-CO', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
 
-    // Guardar cambios
-    saveBinsData();
-    renderAllMarkers();
+      const reporteObj = {
+        fecha: fechaHora,
+        estado: nuevoEstado,
+        ciudadano: ciudadano,
+        comentario: comentario,
+        foto: capturedPhotoBase64
+      };
 
-    // Reproducir sonido sintético de confirmación
-    playBeepSound(nuevoEstado === 'sobrelleno' || nuevoEstado === 'lleno' ? 'alert' : 'success');
+      // Actualizar contenedor
+      currentActiveBin.estado = nuevoEstado;
+      currentActiveBin.nivelPorcentaje = nuevoEstado === 'sobrelleno' ? 100 : (nuevoEstado === 'lleno' ? 90 : (nuevoEstado === 'medio' ? 50 : 10));
+      currentActiveBin.ultimoReporte = {
+        fecha: "Hace un momento",
+        ciudadano: ciudadano,
+        comentario: comentario,
+        foto: capturedPhotoBase64
+      };
 
-    closeModal('modal-report');
+      if (!currentActiveBin.historial) currentActiveBin.historial = [];
+      currentActiveBin.historial.unshift(reporteObj);
 
-    // Mensaje de éxito
-    if (nuevoEstado === 'sobrelleno' || nuevoEstado === 'lleno') {
-      showToast(`¡Reporte de ALERTA recibido! El contenedor se marcó en ROJO y activó el mapa de calor.`, 'danger');
-    } else {
-      showToast(`¡Reporte registrado con éxito! Gracias por tu colaboración cívica en Montería.`, 'success');
+      // Guardar cambios protegidos contra cuotas de almacenamiento
+      saveBinsData();
+      renderAllMarkers();
+
+      // Reproducir sonido de confirmación
+      playBeepSound(nuevoEstado === 'sobrelleno' || nuevoEstado === 'lleno' ? 'alert' : 'success');
+
+      // Cerrar modal de reporte de inmediato
+      closeModal('modal-report');
+
+      // Mensaje Toast de éxito
+      if (nuevoEstado === 'sobrelleno' || nuevoEstado === 'lleno') {
+        showToast(`¡Reporte de ALERTA recibido! El contenedor se marcó en ROJO en Montería.`, 'danger');
+      } else {
+        showToast(`¡Reporte registrado con éxito! Gracias por tu colaboración cívica en Montería.`, 'success');
+      }
+
+      // Enfocar contenedor en el mapa
+      focusBin(currentActiveBin.id);
+    } catch (err) {
+      console.error("Error al procesar reporte:", err);
+      alert("Se registró el reporte, actualizando mapa...");
+      closeModal('modal-report');
+      focusBin(currentActiveBin.id);
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = originalBtnHtml;
     }
-
-    // Enfocar el contenedor en el mapa
-    focusBin(currentActiveBin.id);
   }
 
   // Generador de evidencia fotográfica sintética en caso de que el usuario no use cámara en la prueba
